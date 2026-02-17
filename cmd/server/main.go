@@ -11,7 +11,7 @@ import (
 
 	"dvith.com/go-service-api/internal/config"
 	"dvith.com/go-service-api/internal/domain"
-	"dvith.com/go-service-api/pkg"
+	"dvith.com/go-service-api/pkg/logger"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -28,17 +28,17 @@ func main() {
 
 	switch strings.ToLower(cfg.LogLevel) {
 	case "debug":
-		pkg.SetLevel(pkg.DebugLevel)
+		logger.SetLevel(logger.DebugLevel)
 	case "warn", "warning":
-		pkg.SetLevel(pkg.WarnLevel)
+		logger.SetLevel(logger.WarnLevel)
 	case "error":
-		pkg.SetLevel(pkg.ErrorLevel)
+		logger.SetLevel(logger.ErrorLevel)
 	default:
-		pkg.SetLevel(pkg.InfoLevel)
+		logger.SetLevel(logger.InfoLevel)
 	}
 
 	// Log the active log level and port so it's visible on startup.
-	pkg.Info("starting service", map[string]any{"level": strings.ToLower(cfg.LogLevel), "port": cfg.Port})
+	logger.Info("starting service", map[string]any{"level": strings.ToLower(cfg.LogLevel), "port": cfg.Port})
 
 	// set up routes and start the server
 	domain.Init(app)
@@ -57,7 +57,7 @@ func main() {
 
 	select {
 	case sig := <-sigCh:
-		pkg.Info("shutdown signal received", map[string]any{"signal": sig.String()})
+		logger.Info("shutdown signal received", map[string]any{"signal": sig.String()})
 
 		// give the server up to 10s to shut down gracefully
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -66,21 +66,21 @@ func main() {
 		done := make(chan struct{})
 		go func() {
 			if err := app.Shutdown(); err != nil {
-				pkg.Error("error during shutdown", map[string]any{"err": err.Error()})
+				logger.Error("error during shutdown", map[string]any{"err": err.Error()})
 			}
 			close(done)
 		}()
 
 		select {
 		case <-done:
-			pkg.Info("server stopped", nil)
+			logger.Info("server stopped", nil)
 		case <-ctx.Done():
-			pkg.Warn("graceful shutdown timed out", nil)
+			logger.Warn("graceful shutdown timed out", nil)
 		}
 
 	case err := <-srvErr:
 		if err != nil {
-			pkg.Error("server listen error", map[string]any{"err": err.Error(), "addr": addr})
+			logger.Error("server listen error", map[string]any{"err": err.Error(), "addr": addr})
 			os.Exit(1)
 		}
 	}
