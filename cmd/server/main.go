@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"dvith.com/go-service-api/internal/config"
-	"dvith.com/go-service-api/internal/routes"
+	"dvith.com/go-service-api/internal/domain"
 	"dvith.com/go-service-api/pkg"
 	"github.com/gofiber/fiber/v3"
 )
@@ -41,7 +41,7 @@ func main() {
 	pkg.Info("starting service", map[string]any{"level": strings.ToLower(cfg.LogLevel), "port": cfg.Port})
 
 	// set up routes and start the server
-	routes.SetupRoutes(app)
+	domain.Init(app)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 
