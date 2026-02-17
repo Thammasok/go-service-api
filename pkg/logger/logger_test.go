@@ -18,7 +18,7 @@ func TestLoggerLevelsText(t *testing.T) {
 	if strings.Contains(out, "hidden") {
 		t.Fatalf("debug message should not be logged at info level")
 	}
-	if !strings.Contains(out, "visible") || !strings.Contains(out, "[INFO]") {
+	if !strings.Contains(out, "visible") || !strings.Contains(out, "msg=visible") {
 		t.Fatalf("expected info message in output, got: %q", out)
 	}
 }
@@ -34,13 +34,13 @@ func TestLoggerJSONOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &obj); err != nil {
 		t.Fatalf("output is not valid JSON: %v, out=%q", err, out)
 	}
-	if obj["level"] != "ERROR" || obj["msg"] != "oops" {
+	// Logrus uses lowercase "error" for error level
+	if obj["level"] != "error" || obj["msg"] != "oops" {
 		t.Fatalf("unexpected json fields: %v", obj)
 	}
-	if fields, ok := obj["fields"].(map[string]any); !ok {
-		t.Fatalf("expected fields object, got: %T", obj["fields"])
-	} else if fields["code"].(float64) != 123 {
-		t.Fatalf("expected code 123 in fields, got: %v", fields["code"])
+	// Logrus merges fields directly into the entry, not under a "fields" key
+	if obj["code"].(float64) != 123 {
+		t.Fatalf("expected code 123 in fields, got: %v", obj["code"])
 	}
 }
 
@@ -54,15 +54,12 @@ func TestWithFieldsMerged(t *testing.T) {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(buf.String())), &obj); err != nil {
 		t.Fatalf("json unmarshal: %v", err)
 	}
-	f, ok := obj["fields"].(map[string]any)
-	if !ok {
-		t.Fatalf("missing fields in entry: %v", obj)
+	// Logrus merges fields directly into the entry
+	if obj["service"] != "api" {
+		t.Fatalf("expected service field, got: %v", obj["service"])
 	}
-	if f["service"] != "api" {
-		t.Fatalf("expected service field, got: %v", f["service"])
-	}
-	if f["port"].(float64) != 8080 {
-		t.Fatalf("expected port 8080, got: %v", f["port"])
+	if obj["port"].(float64) != 8080 {
+		t.Fatalf("expected port 8080, got: %v", obj["port"])
 	}
 }
 

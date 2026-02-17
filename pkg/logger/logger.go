@@ -1,15 +1,13 @@
 package logger
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 	"os"
-	"sync"
-	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
-// Level controls log verbosity.
+// Level is a log level type.
 type Level int
 
 const (
@@ -34,25 +32,51 @@ func (l Level) String() string {
 	}
 }
 
-// Logger is a small, concurrency-safe leveled logger that can emit
-// either human-readable text or JSON.
+// toLogrusLevel converts our Level to logrus.Level.
+func toLogrusLevel(l Level) logrus.Level {
+	switch l {
+	case DebugLevel:
+		return logrus.DebugLevel
+	case InfoLevel:
+		return logrus.InfoLevel
+	case WarnLevel:
+		return logrus.WarnLevel
+	case ErrorLevel:
+		return logrus.ErrorLevel
+	default:
+		return logrus.InfoLevel
+	}
+}
+
+// Logger wraps logrus.Logger for consistent API.
 type Logger struct {
-	mu     sync.Mutex
-	out    io.Writer
-	level  Level
-	json   bool
+	logrus *logrus.Logger
 	fields map[string]any
 }
 
-// NewLogger constructs a new Logger writing to out with the provided level.
+// NewLogger constructs a new Logger using logrus backend with JSON formatting.
 func NewLogger(out io.Writer, level Level, jsonFmt bool) *Logger {
 	if out == nil {
 		out = os.Stdout
 	}
+
+	l := logrus.New()
+	l.SetOutput(out)
+	l.SetLevel(toLogrusLevel(level))
+
+	if jsonFmt {
+		l.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: "2006-01-02T15:04:05Z07:00",
+		})
+	} else {
+		l.SetFormatter(&logrus.TextFormatter{
+			TimestampFormat: "2006-01-02T15:04:05Z07:00",
+			FullTimestamp:   true,
+		})
+	}
+
 	return &Logger{
-		out:    out,
-		level:  level,
-		json:   jsonFmt,
+		logrus: l,
 		fields: make(map[string]any),
 	}
 }
@@ -64,9 +88,7 @@ func NewDefault() *Logger {
 
 func (l *Logger) clone() *Logger {
 	nl := &Logger{
-		out:   l.out,
-		level: l.level,
-		json:  l.json,
+		logrus: l.logrus,
 	}
 	nl.fields = make(map[string]any, len(l.fields))
 	for k, v := range l.fields {
@@ -87,25 +109,26 @@ func (l *Logger) WithFields(fields map[string]any) *Logger {
 
 // SetLevel updates the logger level.
 func (l *Logger) SetLevel(level Level) {
-	l.mu.Lock()
-	l.level = level
-	l.mu.Unlock()
+	l.logrus.SetLevel(toLogrusLevel(level))
 }
 
 // SetJSON toggles JSON output.
 func (l *Logger) SetJSON(jsonFmt bool) {
-	l.mu.Lock()
-	l.json = jsonFmt
-	l.mu.Unlock()
+	if jsonFmt {
+		l.logrus.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: "2006-01-02T15:04:05Z07:00",
+		})
+	} else {
+		l.logrus.SetFormatter(&logrus.TextFormatter{
+			TimestampFormat: "2006-01-02T15:04:05Z07:00",
+			FullTimestamp:   true,
+		})
+	}
 }
 
 func (l *Logger) log(level Level, msg string, fields map[string]any) {
-	if level < l.level {
-		return
-	}
-
 	// merge logger fields and entry fields
-	data := make(map[string]any, len(l.fields)+len(fields)+3)
+	data := make(map[string]any, len(l.fields)+len(fields))
 	for k, v := range l.fields {
 		data[k] = v
 	}
@@ -113,35 +136,18 @@ func (l *Logger) log(level Level, msg string, fields map[string]any) {
 		data[k] = v
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	entry := l.logrus.WithFields(data)
 
-	if l.json {
-		entry := map[string]any{
-			"time":  time.Now().Format(time.RFC3339),
-			"level": level.String(),
-			"msg":   msg,
-		}
-		if len(data) > 0 {
-			entry["fields"] = data
-		}
-		enc, err := json.Marshal(entry)
-		if err != nil {
-			fmt.Fprintf(l.out, "{"+"\"time\":\"%s\",\"level\":\"%s\",\"msg\":\"%s\"}"+"\n", time.Now().Format(time.RFC3339), level.String(), msg)
-			return
-		}
-		fmt.Fprintln(l.out, string(enc))
-		return
+	switch level {
+	case DebugLevel:
+		entry.Debug(msg)
+	case InfoLevel:
+		entry.Info(msg)
+	case WarnLevel:
+		entry.Warn(msg)
+	case ErrorLevel:
+		entry.Error(msg)
 	}
-
-	// human readable
-	out := fmt.Sprintf("%s [%s] %s", time.Now().Format(time.RFC3339), level.String(), msg)
-	if len(data) > 0 {
-		for k, v := range data {
-			out += fmt.Sprintf(" %s=%v", k, v)
-		}
-	}
-	fmt.Fprintln(l.out, out)
 }
 
 // Debug logs a message at Debug level.
