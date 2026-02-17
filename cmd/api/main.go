@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"dvith.com/go-service-api/internal/config"
 	"dvith.com/go-service-api/internal/routes"
@@ -40,8 +44,44 @@ func main() {
 	routes.SetupRoutes(app)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	if err := app.Listen(addr); err != nil {
-		pkg.Error("failed to start server", map[string]any{"err": err.Error(), "addr": addr})
-		os.Exit(1)
+
+	// Start server in background so we can handle graceful shutdown.
+	srvErr := make(chan error, 1)
+	go func() {
+		srvErr <- app.Listen(addr)
+	}()
+
+	// trap signals for graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case sig := <-sigCh:
+		pkg.Info("shutdown signal received", map[string]any{"signal": sig.String()})
+
+		// give the server up to 10s to shut down gracefully
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			if err := app.Shutdown(); err != nil {
+				pkg.Error("error during shutdown", map[string]any{"err": err.Error()})
+			}
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			pkg.Info("server stopped", nil)
+		case <-ctx.Done():
+			pkg.Warn("graceful shutdown timed out", nil)
+		}
+
+	case err := <-srvErr:
+		if err != nil {
+			pkg.Error("server listen error", map[string]any{"err": err.Error(), "addr": addr})
+			os.Exit(1)
+		}
 	}
 }

@@ -46,9 +46,6 @@ func LoadFromEnv() (Config, error) {
 	c.ReadTimeout = 5 * time.Second
 	c.WriteTimeout = 10 * time.Second
 
-	if v := os.Getenv("URL"); v != "" {
-		c.URL = v
-	}
 	if v := os.Getenv("PORT"); v != "" {
 		p, err := strconv.Atoi(v)
 		if err != nil {
@@ -111,11 +108,11 @@ func LoadFromFile(path string) (Config, error) {
 
 	// Start with defaults then override from vals map.
 	c := Config{
-		Port:        8080,
-		Env:         "development",
-		LogLevel:    "info",
-		DatabaseURL: "",
-		ReadTimeout: 5 * time.Second,
+		Port:         8080,
+		Env:          "development",
+		LogLevel:     "info",
+		DatabaseURL:  "",
+		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
 
