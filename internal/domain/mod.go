@@ -1,13 +1,15 @@
 package domain
 
 import (
+	"dvith.com/go-service-api/internal/domain/authentication"
 	"dvith.com/go-service-api/internal/domain/common"
 	"dvith.com/go-service-api/internal/domain/examples"
 	"dvith.com/go-service-api/internal/middleware"
+	"dvith.com/go-service-api/pkg/database"
 	"github.com/gofiber/fiber/v3"
 )
 
-func Init(app *fiber.App) {
+func Init(app *fiber.App, db *database.DBPool) {
 	// Group all routes under /api/v1 prefix
 	apiV1 := app.Group("/api/v1")
 
@@ -16,6 +18,7 @@ func Init(app *fiber.App) {
 
 	// Register route handlers
 	common.Routers(apiV1)
+	authentication.Routers(apiV1, db)
 
 	// Register example handlers (demonstrating error handling)
 	examples.RegisterRoutes(apiV1)

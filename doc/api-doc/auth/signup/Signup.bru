@@ -1,0 +1,25 @@
+meta {
+  name: Signup
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{SERVICE_URL}}/api/v1/signup
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "full_name": "jaranchai",
+    "username": "jaranchai",
+    "email": "jaranchai.nt@hotmail.com",
+    "password": "Jaranchai@12345"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

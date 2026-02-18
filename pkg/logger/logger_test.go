@@ -63,6 +63,29 @@ func TestWithFieldsMerged(t *testing.T) {
 	})
 }
 
+func TestLevelFromEnv(t *testing.T) {
+	tests := []struct {
+		env      string
+		expected Level
+	}{
+		{"development", DebugLevel},
+		{"local", DebugLevel},
+		{"DEVELOPMENT", DebugLevel},
+		{"staging", InfoLevel},
+		{"test", InfoLevel},
+		{"production", ErrorLevel},
+		{"PRODUCTION", ErrorLevel},
+		{"unknown", InfoLevel},
+		{"", InfoLevel},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.env, func(t *testing.T) {
+			assert.Equal(t, tt.expected, LevelFromEnv(tt.env))
+		})
+	}
+}
+
 func TestPackageHelpers(t *testing.T) {
 	t.Run("package level helpers", func(t *testing.T) {
 		var buf bytes.Buffer

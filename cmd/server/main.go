@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -24,24 +23,11 @@ func main() {
 	// back to reading from the process environment.
 	cfg, err := config.LoadFromFile(".env")
 	if err != nil {
+		logger.Warn("could not load configuration from .env file", map[string]any{"error": err.Error()})
 		cfg = config.MustLoadFromEnv()
 	}
 
-	logger.Warn("could not load configuration from .env file", map[string]any{"error": err.Error()})
-
-	switch strings.ToLower(cfg.LogLevel) {
-	case "debug":
-		logger.SetLevel(logger.DebugLevel)
-	case "warn", "warning":
-		logger.SetLevel(logger.WarnLevel)
-	case "error":
-		logger.SetLevel(logger.ErrorLevel)
-	default:
-		logger.SetLevel(logger.InfoLevel)
-	}
-
-	// set up routes and start the server
-	domain.Init(app)
+	logger.InitFromEnv(cfg.Env)
 
 	// If a database URL is provided, initialize the connection pool.
 	db, err := database.NewDB(context.Background(), cfg.DatabaseURL)
@@ -49,6 +35,9 @@ func main() {
 		logger.Error("failed to initialize database", map[string]any{"error": err.Error()})
 	}
 	defer db.Close()
+
+	// set up routes and start the server
+	domain.Init(app, db)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 

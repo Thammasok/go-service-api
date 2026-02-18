@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "go-service-api-doc",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

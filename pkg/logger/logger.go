@@ -4,6 +4,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -49,13 +50,25 @@ func toLogrusLevel(l Level) logrus.Level {
 	}
 }
 
+// newTextFormatter returns a logrus TextFormatter with a clean, readable layout.
+// colors=true enables ANSI colour codes (intended for interactive terminals).
+func newTextFormatter(colors bool) logrus.Formatter {
+	return &logrus.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		FullTimestamp:   true,
+		ForceColors:     colors,
+		DisableColors:   !colors,
+		PadLevelText:    true,
+	}
+}
+
 // Logger wraps logrus.Logger for consistent API.
 type Logger struct {
 	logrus *logrus.Logger
 	fields map[string]any
 }
 
-// NewLogger constructs a new Logger using logrus backend with JSON formatting.
+// NewLogger constructs a new Logger using logrus backend.
 func NewLogger(out io.Writer, level Level, jsonFmt bool) *Logger {
 	if out == nil {
 		out = os.Stdout
@@ -70,10 +83,7 @@ func NewLogger(out io.Writer, level Level, jsonFmt bool) *Logger {
 			TimestampFormat: "2006-01-02T15:04:05Z07:00",
 		})
 	} else {
-		l.SetFormatter(&logrus.TextFormatter{
-			TimestampFormat: "2006-01-02T15:04:05Z07:00",
-			FullTimestamp:   true,
-		})
+		l.SetFormatter(newTextFormatter(false))
 	}
 
 	return &Logger{
@@ -120,15 +130,11 @@ func (l *Logger) SetJSON(jsonFmt bool) {
 			TimestampFormat: "2006-01-02T15:04:05Z07:00",
 		})
 	} else {
-		l.logrus.SetFormatter(&logrus.TextFormatter{
-			TimestampFormat: "2006-01-02T15:04:05Z07:00",
-			FullTimestamp:   true,
-		})
+		l.logrus.SetFormatter(newTextFormatter(false))
 	}
 }
 
 func (l *Logger) log(level Level, msg string, fields map[string]any) {
-	// merge logger fields and entry fields
 	data := make(map[string]any, len(l.fields)+len(fields))
 	maps.Copy(data, l.fields)
 	for k, v := range fields {
@@ -161,7 +167,7 @@ func (l *Logger) Warn(msg string, fields map[string]any) { l.log(WarnLevel, msg,
 // Error logs a message at Error level.
 func (l *Logger) Error(msg string, fields map[string]any) { l.log(ErrorLevel, msg, fields) }
 
-// Package-level default logger and helpers
+// Package-level default logger.
 var std = NewDefault()
 
 // Std returns the package-level logger (for advanced callers).
@@ -175,3 +181,35 @@ func Error(msg string, fields map[string]any) { std.Error(msg, fields) }
 
 // SetLevel updates the default logger level.
 func SetLevel(level Level) { std.SetLevel(level) }
+
+// SetJSON toggles JSON output on the default logger.
+func SetJSON(jsonFmt bool) { std.SetJSON(jsonFmt) }
+
+// LevelFromEnv returns the log level appropriate for the given environment name.
+//
+//	development, local → DebugLevel  (all logs)
+//	staging, test      → InfoLevel
+//	production         → ErrorLevel
+//	(anything else)    → InfoLevel
+func LevelFromEnv(env string) Level {
+	switch strings.ToLower(env) {
+	case "development", "local":
+		return DebugLevel
+	case "staging", "test":
+		return InfoLevel
+	case "production":
+		return ErrorLevel
+	default:
+		return InfoLevel
+	}
+}
+
+// InitFromEnv configures the default logger for the given application environment.
+// It sets the log level automatically and enables coloured output for
+// development/local environments.
+func InitFromEnv(env string) {
+	std.SetLevel(LevelFromEnv(env))
+
+	isDev := strings.ToLower(env) == "development" || strings.ToLower(env) == "local"
+	std.logrus.SetFormatter(newTextFormatter(isDev))
+}
