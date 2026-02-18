@@ -2,6 +2,7 @@ package logger
 
 import (
 	"io"
+	"maps"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -129,9 +130,7 @@ func (l *Logger) SetJSON(jsonFmt bool) {
 func (l *Logger) log(level Level, msg string, fields map[string]any) {
 	// merge logger fields and entry fields
 	data := make(map[string]any, len(l.fields)+len(fields))
-	for k, v := range l.fields {
-		data[k] = v
-	}
+	maps.Copy(data, l.fields)
 	for k, v := range fields {
 		data[k] = v
 	}

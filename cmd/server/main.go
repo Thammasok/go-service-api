@@ -11,6 +11,7 @@ import (
 
 	"dvith.com/go-service-api/internal/config"
 	"dvith.com/go-service-api/internal/domain"
+	"dvith.com/go-service-api/pkg/database"
 	"dvith.com/go-service-api/pkg/logger"
 	"github.com/gofiber/fiber/v3"
 )
@@ -26,6 +27,8 @@ func main() {
 		cfg = config.MustLoadFromEnv()
 	}
 
+	logger.Warn("could not load configuration from .env file", map[string]any{"error": err.Error()})
+
 	switch strings.ToLower(cfg.LogLevel) {
 	case "debug":
 		logger.SetLevel(logger.DebugLevel)
@@ -37,11 +40,15 @@ func main() {
 		logger.SetLevel(logger.InfoLevel)
 	}
 
-	// Log the active log level and port so it's visible on startup.
-	logger.Info("starting service", map[string]any{"level": strings.ToLower(cfg.LogLevel), "port": cfg.Port})
-
 	// set up routes and start the server
 	domain.Init(app)
+
+	// If a database URL is provided, initialize the connection pool.
+	db, err := database.NewDB(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to initialize database", map[string]any{"error": err.Error()})
+	}
+	defer db.Close()
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 
