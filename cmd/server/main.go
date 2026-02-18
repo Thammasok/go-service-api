@@ -37,7 +37,7 @@ func main() {
 	defer db.Close()
 
 	// set up routes and start the server
-	domain.Init(app, db)
+	domain.Init(app, db, cfg)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 

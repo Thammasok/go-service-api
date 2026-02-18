@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	hashpassword "dvith.com/go-service-api/internal/security/hash_password"
+	"dvith.com/go-service-api/internal/security/token"
 )
 
 // SignupRequest represents the user signup request
@@ -15,20 +16,31 @@ type SignupRequest struct {
 	Username string `json:"username" validate:"required,min=3,max=100"`
 }
 
-// SignupService handles user signup operations
-type SignupService struct {
-	repo *SignupRepository
+// SignupResponse represents the signup response with user and tokens
+type SignupResponse struct {
+	User         *User  `json:"user"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
 }
 
-// NewSignupService creates a new signup service
-func NewSignupService(repo *SignupRepository) *SignupService {
+// SignupService handles user signup operations
+type SignupService struct {
+	repo         *SignupRepository
+	tokenManager *token.TokenManager
+}
+
+// NewSignupService creates a new signup service with token manager
+func NewSignupService(repo *SignupRepository, tokenManager *token.TokenManager) *SignupService {
 	return &SignupService{
-		repo: repo,
+		repo:         repo,
+		tokenManager: tokenManager,
 	}
 }
 
-// RegisterUser registers a new user with password hashing
-func (s *SignupService) RegisterUser(ctx context.Context, req *SignupRequest) (*User, error) {
+// RegisterUser registers a new user with password hashing and returns tokens
+func (s *SignupService) RegisterUser(ctx context.Context, req *SignupRequest) (*SignupResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("signup request cannot be nil")
 	}
@@ -60,5 +72,17 @@ func (s *SignupService) RegisterUser(ctx context.Context, req *SignupRequest) (*
 		return nil, fmt.Errorf("failed to register user: %w", err)
 	}
 
-	return savedUser, nil
+	// Generate JWT tokens
+	tokenPair, err := s.tokenManager.GenerateTokenPair(savedUser.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate tokens: %w", err)
+	}
+
+	return &SignupResponse{
+		User:         savedUser,
+		AccessToken:  tokenPair.AccessToken,
+		RefreshToken: tokenPair.RefreshToken,
+		TokenType:    tokenPair.TokenType,
+		ExpiresIn:    tokenPair.ExpiresIn,
+	}, nil
 }

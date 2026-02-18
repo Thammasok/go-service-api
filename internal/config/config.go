@@ -34,6 +34,18 @@ type Config struct {
 
 	// WriteTimeout for HTTP server
 	WriteTimeout time.Duration `env:"WRITE_TIMEOUT,default=10s"`
+
+	// JWT Secret Key for signing tokens
+	JWTSecretKey string `env:"JWT_SECRET_KEY,default=your-secret-key-change-in-production"`
+
+	// JWT Token Expiration Time
+	JWTExpirationTime time.Duration `env:"JWT_EXPIRATION_TIME,default=1h"`
+
+	// JWT Refresh Token Duration
+	JWTRefreshDuration time.Duration `env:"JWT_REFRESH_DURATION,default=168h"`
+
+	// JWT Issuer
+	JWTIssuer string `env:"JWT_ISSUER,default=go-service-api"`
 }
 
 // LoadFromEnv loads configuration from environment variables using go-envconfig.
@@ -90,12 +102,16 @@ func LoadFromFile(path string) (Config, error) {
 
 	// Start with defaults then override from vals map.
 	c := Config{
-		Port:         8080,
-		Env:          "development",
-		LogLevel:     "info",
-		DatabaseURL:  "",
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		Port:                8080,
+		Env:                 "development",
+		LogLevel:            "info",
+		DatabaseURL:         "",
+		ReadTimeout:         5 * time.Second,
+		WriteTimeout:        10 * time.Second,
+		JWTSecretKey:        "your-secret-key-change-in-production",
+		JWTExpirationTime:   1 * time.Hour,
+		JWTRefreshDuration:  7 * 24 * time.Hour,
+		JWTIssuer:           "go-service-api",
 	}
 
 	if v, ok := vals["PORT"]; ok && v != "" {
@@ -131,6 +147,26 @@ func LoadFromFile(path string) (Config, error) {
 		}
 		c.WriteTimeout = d
 	}
+	if v, ok := vals["JWT_SECRET_KEY"]; ok && v != "" {
+		c.JWTSecretKey = v
+	}
+	if v, ok := vals["JWT_EXPIRATION_TIME"]; ok && v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return c, fmt.Errorf("invalid JWT_EXPIRATION_TIME in file: %w", err)
+		}
+		c.JWTExpirationTime = d
+	}
+	if v, ok := vals["JWT_REFRESH_DURATION"]; ok && v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return c, fmt.Errorf("invalid JWT_REFRESH_DURATION in file: %w", err)
+		}
+		c.JWTRefreshDuration = d
+	}
+	if v, ok := vals["JWT_ISSUER"]; ok && v != "" {
+		c.JWTIssuer = v
+	}
 
 	return c, nil
 }
@@ -161,6 +197,22 @@ func (c Config) Validate() error {
 	}
 	if c.WriteTimeout <= 0 {
 		return fmt.Errorf("WRITE_TIMEOUT must be > 0")
+	}
+
+	if strings.TrimSpace(c.JWTSecretKey) == "" {
+		return fmt.Errorf("JWT_SECRET_KEY is required")
+	}
+
+	if c.JWTExpirationTime <= 0 {
+		return fmt.Errorf("JWT_EXPIRATION_TIME must be > 0")
+	}
+
+	if c.JWTRefreshDuration <= 0 {
+		return fmt.Errorf("JWT_REFRESH_DURATION must be > 0")
+	}
+
+	if strings.TrimSpace(c.JWTIssuer) == "" {
+		return fmt.Errorf("JWT_ISSUER is required")
 	}
 
 	if strings.ToLower(c.Env) == "production" && strings.TrimSpace(c.DatabaseURL) == "" {
