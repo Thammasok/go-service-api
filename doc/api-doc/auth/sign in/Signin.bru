@@ -1,11 +1,11 @@
 meta {
   name: Signin
   type: http
-  seq: 2
+  seq: 1
 }
 
 post {
-  url: {{SERVICE_URL}}/api/v1/signin
+  url: {{SERVICE_URL}}/api/v1/auth/signin
   body: json
   auth: inherit
 }

@@ -11,7 +11,7 @@ import (
 
 func Routers(app fiber.Router, db *database.DBPool, cfg config.Config) {
 	// Authentication routes
-	app.Post("/signup", signup.SignupHandler(db, cfg))
-	app.Post("/signin", signin.SigninHandler(db, cfg))
-	app.Post("/refresh-token", refreshtoken.RefreshTokenHandler(db, cfg))
+	app.Post("/auth/signup", signup.SignupHandler(db, cfg))
+	app.Post("/auth/signin", signin.SigninHandler(db, cfg))
+	app.Post("/auth/refresh-token", refreshtoken.RefreshTokenHandler(db, cfg))
 }
